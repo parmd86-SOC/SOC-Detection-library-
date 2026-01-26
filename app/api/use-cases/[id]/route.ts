@@ -1,99 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { updateUseCaseSchema } from '@/lib/validations'
+import { useCaseQueriesSchema } from '@/lib/validations'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET(
+interface RouteParams {
+  params: Promise<{ id: string }>
+}
+
+export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteParams
 ) {
   try {
-    const useCase = await prisma.useCase.findUnique({
-      where: { id: params.id },
-      include: {
-        log_sources: {
-          include: {
-            log_source: true,
-          },
-        },
-        mitre_techniques: {
-          include: {
-            technique: true,
-          },
-        },
-        queries: true,
-      },
-    })
+    const { id } = await context.params
+    const body = await request.json()
+    const validated = useCaseQueriesSchema.parse(body)
 
-    if (!useCase) {
-      return NextResponse.json(
-        { error: 'Use case not found' },
-        { status: 404 }
-      )
+    for (const query of validated.queries) {
+      await prisma.useCaseQuery.upsert({
+        where: {
+          use_case_id_siem_type: {
+            use_case_id: id,
+            siem_type: query.siem_type,
+          },
+        },
+        update: {
+          query_text: query.query_text,
+        },
+        create: {
+          use_case_id: id,
+          siem_type: query.siem_type,
+          query_text: query.query_text,
+        },
+      })
     }
 
-    return NextResponse.json(useCase)
-  } catch (error) {
-    console.error('Error fetching use case:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch use case' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const body = await request.json()
-    const validated = updateUseCaseSchema.parse(body)
-
-    const useCase = await prisma.useCase.update({
-      where: { id: params.id },
-      data: validated,
+    const useCase = await prisma.useCase.findUnique({
+      where: { id },
       include: {
-        log_sources: {
-          include: {
-            log_source: true,
-          },
-        },
-        mitre_techniques: {
-          include: {
-            technique: true,
-          },
-        },
         queries: true,
       },
     })
 
     return NextResponse.json(useCase)
   } catch (error) {
-    console.error('Error updating use case:', error)
+    console.error('Error updating queries:', error)
     return NextResponse.json(
-      { error: 'Failed to update use case' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    await prisma.useCase.delete({
-      where: { id: params.id },
-    })
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting use case:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete use case' },
+      { error: 'Failed to update queries' },
       { status: 500 }
     )
   }
