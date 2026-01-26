@@ -1,36 +1,39 @@
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { useCaseMitreSchema } from '@/lib/validations'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+interface RouteParams {
+  params: Promise<{ id: string }>
+}
+
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteParams
 ) {
   try {
+    const { id } = await context.params
     const body = await request.json()
     const validated = useCaseMitreSchema.parse(body)
 
-    // Delete existing associations
     await prisma.useCaseMitre.deleteMany({
-      where: { use_case_id: params.id },
+      where: { use_case_id: id },
     })
 
-    // Create new associations
     if (validated.technique_ids.length > 0) {
       await prisma.useCaseMitre.createMany({
         data: validated.technique_ids.map((techniqueId) => ({
-          use_case_id: params.id,
+          use_case_id: id,
           technique_id: techniqueId,
         })),
         skipDuplicates: true,
       })
     }
 
-    // Return updated use case
     const useCase = await prisma.useCase.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         mitre_techniques: {
           include: {
