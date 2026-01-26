@@ -6,6 +6,9 @@ export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
+    // Test database connection first
+    await prisma.$connect()
+    
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
     const logSource = searchParams.get('logSource') || ''
@@ -15,11 +18,9 @@ export async function GET(request: NextRequest) {
     const hasChronicle = searchParams.get('hasChronicle')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
-
     const skip = (page - 1) * limit
-
     const where: any = {}
-
+    
     if (search) {
       where.OR = [
         { use_case_code: { contains: search, mode: 'insensitive' } },
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
         { description: { contains: search, mode: 'insensitive' } },
       ]
     }
-
+    
     if (logSource) {
       where.log_sources = {
         some: {
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
         },
       }
     }
-
+    
     if (technique) {
       where.mitre_techniques = {
         some: {
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
         },
       }
     }
-
+    
     if (tactic) {
       where.mitre_techniques = {
         some: {
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
         },
       }
     }
-
+    
     if (hasSentinel === 'true') {
       where.queries = {
         some: {
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
         },
       }
     }
-
+    
     if (hasChronicle === 'true') {
       where.queries = {
         some: {
@@ -74,9 +75,8 @@ export async function GET(request: NextRequest) {
         },
       }
     }
-
+    
     const total = await prisma.useCase.count({ where })
-
     const useCases = await prisma.useCase.findMany({
       where,
       skip,
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         queries: true,
       },
     })
-
+    
     return NextResponse.json({
       data: useCases,
       pagination: {
@@ -108,8 +108,15 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error fetching use cases:', error)
+    
+    // Return more detailed error in development
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    
     return NextResponse.json(
-      { error: 'Failed to fetch use cases' },
+      { 
+        error: 'Failed to fetch use cases',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined 
+      },
       { status: 500 }
     )
   }
