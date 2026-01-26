@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -15,7 +18,6 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit
 
-    // Build where clause
     const where: any = {}
 
     if (search) {
@@ -73,10 +75,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get total count
     const total = await prisma.useCase.count({ where })
 
-    // Get use cases with relations
     const useCases = await prisma.useCase.findMany({
       where,
       skip,
