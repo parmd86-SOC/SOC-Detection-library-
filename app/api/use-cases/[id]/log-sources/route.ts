@@ -1,35 +1,38 @@
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { useCaseLogSourcesSchema } from '@/lib/validations'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+interface RouteParams {
+  params: Promise<{ id: string }>
+}
+
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteParams
 ) {
   try {
+    const { id } = await context.params
     const body = await request.json()
     const validated = useCaseLogSourcesSchema.parse(body)
 
-    // Delete existing associations
     await prisma.useCaseLogSource.deleteMany({
-      where: { use_case_id: params.id },
+      where: { use_case_id: id },
     })
 
-    // Create new associations
     if (validated.log_source_ids.length > 0) {
       await prisma.useCaseLogSource.createMany({
         data: validated.log_source_ids.map((logSourceId) => ({
-          use_case_id: params.id,
+          use_case_id: id,
           log_source_id: logSourceId,
         })),
       })
     }
 
-    // Return updated use case
     const useCase = await prisma.useCase.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         log_sources: {
           include: {
