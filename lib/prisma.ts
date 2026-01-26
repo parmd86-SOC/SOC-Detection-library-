@@ -11,3 +11,20 @@ export const prisma =
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
+// Ensure connection on cold starts
+export async function connectPrisma() {
+  try {
+    await prisma.$connect()
+  } catch (error) {
+    console.error('Failed to connect to database:', error)
+    throw error
+  }
+}
+
+// Disconnect on app shutdown
+if (process.env.NODE_ENV === 'production') {
+  process.on('beforeExit', async () => {
+    await prisma.$disconnect()
+  })
+}
