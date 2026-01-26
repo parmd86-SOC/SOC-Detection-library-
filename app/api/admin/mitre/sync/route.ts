@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { syncMitreAttack } from '@/lib/mitre-sync'
 import { mitreSyncSchema } from '@/lib/validations'
-import { prisma } from '@/lib/prisma'
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,28 +22,6 @@ export async function POST(request: NextRequest) {
     console.error('Error syncing MITRE:', error)
     return NextResponse.json(
       { error: 'Failed to sync MITRE data' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function GET() {
-  try {
-    const latestTechnique = await prisma.mitreTechniqueCache.findFirst({
-      orderBy: { last_synced_at: 'desc' },
-      select: { last_synced_at: true },
-    })
-
-    const count = await prisma.mitreTechniqueCache.count()
-
-    return NextResponse.json({
-      last_synced_at: latestTechnique?.last_synced_at || null,
-      technique_count: count,
-    })
-  } catch (error) {
-    console.error('Error fetching MITRE sync status:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch MITRE sync status' },
       { status: 500 }
     )
   }
