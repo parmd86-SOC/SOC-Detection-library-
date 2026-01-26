@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -16,7 +19,7 @@ export async function GET(request: NextRequest) {
           }
         : undefined,
       orderBy: { technique_id: 'asc' },
-      take: 50, // Limit results for typeahead
+      take: 50,
     })
 
     return NextResponse.json(techniques)
