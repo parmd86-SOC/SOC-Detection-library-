@@ -2,16 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createLogSourceSchema } from '@/lib/validations'
 
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
 export async function GET(request: NextRequest) {
   try {
     const logSources = await prisma.logSource.findMany({
+      include: {
+        _count: {
+          select: {
+            use_cases: true,
+          },
+        },
+      },
       orderBy: { name: 'asc' },
     })
 
-    return NextResponse.json(logSources)
+    // Transform to include slug and detection count
+    const result = logSources.map((ls) => ({
+      id: ls.id,
+      name: ls.name,
+      slug: ls.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      detectionCount: ls._count.use_cases,
+      created_at: ls.created_at,
+    }))
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error fetching log sources:', error)
     return NextResponse.json(
