@@ -23,14 +23,17 @@ export async function GET(
 
     const normalized = {
       ...useCase,
+      // LogSource model has: id, name, created_at (no slug)
       logSources: (useCase.log_sources || [])
         .map((x) => x.log_source)
         .filter(Boolean)
-        .map((ls) => ({ id: ls.id, name: ls.name })), // ✅ removed slug
+        .map((ls) => ({ id: ls.id, name: ls.name })),
+
+      // MitreTechnique model uses technique_id not id
       mitreTechniques: (useCase.mitre_techniques || [])
         .map((x) => x.technique)
         .filter(Boolean)
-        .map((t) => ({ id: t.id, name: t.name })),
+        .map((t) => ({ id: t.technique_id, name: t.name })),
     };
 
     return NextResponse.json(normalized);
