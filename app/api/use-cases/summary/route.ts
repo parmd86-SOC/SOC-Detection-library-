@@ -1,52 +1,36 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
-    // log source tiles: count of use cases per log source
     const logSources = await prisma.logSource.findMany({
       select: {
         id: true,
         name: true,
-        slug: true,
+        // ❌ slug removed (doesn't exist in your schema)
         _count: {
           select: {
-            use_cases: true, // assumes relation name is use_cases on LogSource
+            use_cases: true, // keep as-is if this relation name is correct in your schema
           },
         },
       },
       orderBy: { name: "asc" },
     });
 
-    // mitre dropdown options: count of use cases per technique
-    const mitre = await prisma.mitreTechnique.findMany({
-      select: {
-        id: true,
-        name: true,
-        _count: {
-          select: {
-            use_cases: true, // assumes relation name is use_cases on MitreTechnique
-          },
-        },
-      },
-      orderBy: { id: "asc" },
-    });
-
     return NextResponse.json({
-      logSources: logSources.map((ls) => ({
+      items: logSources.map((ls) => ({
         id: ls.id,
         name: ls.name,
-        slug: ls.slug,
-        useCaseCount: ls._count.use_cases,
-      })),
-      mitre: mitre.map((t) => ({
-        id: t.id,
-        name: t.name,
-        useCaseCount: t._count.use_cases,
+        useCaseCount: ls._count?.use_cases ?? 0,
       })),
     });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "Failed to load summary" }, { status: 500 });
+  } catch (error) {
+    console.error("Error fetching use-case summary:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch use-case summary" },
+      { status: 500 }
+    );
   }
 }
