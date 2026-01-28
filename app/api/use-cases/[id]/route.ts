@@ -109,7 +109,8 @@ export async function PATCH(
     return NextResponse.json(
       { error: 'Failed to update use case' },
       { status: 500 }
-    )\n  }
+    )
+  }
 }
 
 export async function DELETE(
