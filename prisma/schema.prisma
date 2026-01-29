@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,30 +8,35 @@ datasource db {
 }
 
 model Tenant {
-  id         String    @id @default(uuid())
+  id         String    @id @default(cuid()) @db.Text
   name       String    @unique
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
-  use_cases  UseCase[]
+
+  use_cases     UseCase[]
+  content_packs ContentPack[]
 
   @@map("tenants")
 }
 
 model UseCase {
-  id                  String              @id @default(uuid())
-  tenant_id           String              @default("default")
-  use_case_code       String              @unique
+  id                  String     @id @default(cuid()) @db.Text
+  tenant_id           String     @db.Text
+  use_case_code       String     @unique
   title               String
-  description         String?             @db.Text
-  investigation_guide String?             @db.Text
-  priority            Priority            @default(MEDIUM)
-  created_at          DateTime            @default(now())
-  updated_at          DateTime            @updatedAt
-  
-  tenant              Tenant              @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  log_sources         UseCaseLogSource[]
-  mitre_techniques    UseCaseMitre[]
-  queries             UseCaseQuery[]
+  description         String?    @db.Text
+  investigation_guide String?    @db.Text
+  priority            Priority   @default(MEDIUM)
+  created_at          DateTime   @default(now())
+  updated_at          DateTime   @updatedAt
+
+  tenant           Tenant              @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  log_sources      UseCaseLogSource[]
+  mitre_techniques UseCaseMitre[]
+  queries          UseCaseQuery[]
+
+  // ✅ Content Packs (Chronicle-style grouping)
+  content_packs    ContentPackUseCase[]
 
   @@index([use_case_code])
   @@index([title])
@@ -43,19 +45,21 @@ model UseCase {
 }
 
 model LogSource {
-  id         String             @id @default(uuid())
+  id         String             @id @default(cuid()) @db.Text
   name       String             @unique
   created_at DateTime           @default(now())
-  use_cases  UseCaseLogSource[]
+
+  use_cases     UseCaseLogSource[]
+  content_packs ContentPackLogSource[]
 
   @@index([name])
   @@map("log_sources")
 }
 
 model UseCaseLogSource {
-  use_case_id   String
-  log_source_id String
-  
+  use_case_id   String   @db.Text
+  log_source_id String   @db.Text
+
   use_case   UseCase   @relation(fields: [use_case_id], references: [id], onDelete: Cascade)
   log_source LogSource @relation(fields: [log_source_id], references: [id], onDelete: Cascade)
 
@@ -65,12 +69,12 @@ model UseCaseLogSource {
 }
 
 model UseCaseQuery {
-  id          String    @id @default(uuid())
-  use_case_id String
+  id          String    @id @default(cuid()) @db.Text
+  use_case_id String    @db.Text
   siem_type   SiemType
   query_text  String    @db.Text
   updated_at  DateTime  @updatedAt
-  
+
   use_case UseCase @relation(fields: [use_case_id], references: [id], onDelete: Cascade)
 
   @@unique([use_case_id, siem_type])
@@ -79,30 +83,76 @@ model UseCaseQuery {
 }
 
 model MitreTechniqueCache {
-  technique_id     String         @id // e.g., T1059, T1059.003
-  name             String
-  description      String?        @db.Text
-  tactics          Json           @default("[]") // array of tactic names
-  platforms        Json           @default("[]") // array of platform names
-  last_synced_at   DateTime       @default(now())
-  raw_stix         Json?          // full STIX object
-  
-  use_cases        UseCaseMitre[]
+  technique_id   String   @id // e.g., T1059, T1059.003
+  name           String
+  description    String?  @db.Text
+  tactics        Json     @default("[]")
+  platforms      Json     @default("[]")
+  last_synced_at DateTime @default(now())
+  raw_stix       Json?
+
+  use_cases UseCaseMitre[]
 
   @@index([name])
   @@map("mitre_techniques_cache")
 }
 
 model UseCaseMitre {
-  use_case_id  String
+  use_case_id  String @db.Text
   technique_id String
-  
-  use_case  UseCase              @relation(fields: [use_case_id], references: [id], onDelete: Cascade)
+
+  use_case  UseCase             @relation(fields: [use_case_id], references: [id], onDelete: Cascade)
   technique MitreTechniqueCache @relation(fields: [technique_id], references: [technique_id], onDelete: Cascade)
 
   @@id([use_case_id, technique_id])
   @@index([technique_id])
   @@map("use_case_mitre")
+}
+
+//
+// ✅ Chronicle-style Content Packs
+//
+model ContentPack {
+  id          String   @id @default(cuid()) @db.Text
+  tenant_id   String   @db.Text
+  name        String
+  description String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  tenant      Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  use_cases   ContentPackUseCase[]
+  log_sources ContentPackLogSource[]
+
+  @@index([tenant_id])
+  @@index([name])
+  @@unique([tenant_id, name])
+  @@map("content_packs")
+}
+
+model ContentPackUseCase {
+  content_pack_id String @db.Text
+  use_case_id     String @db.Text
+
+  content_pack ContentPack @relation(fields: [content_pack_id], references: [id], onDelete: Cascade)
+  use_case     UseCase     @relation(fields: [use_case_id], references: [id], onDelete: Cascade)
+
+  @@id([content_pack_id, use_case_id])
+  @@index([use_case_id])
+  @@map("content_pack_use_cases")
+}
+
+model ContentPackLogSource {
+  content_pack_id String @db.Text
+  log_source_id   String @db.Text
+
+  content_pack ContentPack @relation(fields: [content_pack_id], references: [id], onDelete: Cascade)
+  log_source   LogSource   @relation(fields: [log_source_id], references: [id], onDelete: Cascade)
+
+  @@id([content_pack_id, log_source_id])
+  @@index([log_source_id])
+  @@map("content_pack_log_sources")
 }
 
 enum Priority {
